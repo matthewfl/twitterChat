@@ -1,0 +1,14 @@
+TwitterChat is designed to be a chatter bot that works by looking at the tweets from users.
+More specifically the replys to try and find patterns and become a chatter bot using replys.
+The system uses the twitter stream api to get as many replys/tweets that is can.
+
+To build:
+	you need to get sqlite (http://sqlite.org) and libcurl (http://curl.haxx.se/)
+	also the system can use hoard for better memory (http://hoard.org/) if not using you need to remove from the 
+libs in the makefile
+	
+	you might want to edit the setting in the make file
+	run make
+	then do:
+		sqlite3 tweets.database < tweet.sql
+		sqlite3 know.database < know.sql

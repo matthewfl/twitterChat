@@ -2,7 +2,7 @@ CXXFLAGS = -O2 -Wall -fmessage-length=0
 
 OBJS = twitterChat.o TwitterChatBot.o
 
-LIBS = -lhoard -lpthread -lcurl
+LIBS = -lhoard -lpthread -lcurl -lsqlite3
 # download libs from:
 #	hoard.org # not needed but helps
 #	boost.org
