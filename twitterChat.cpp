@@ -10,9 +10,21 @@
 using namespace std;
 
 int main (int argc, char *argv[]) {
+  if(sqlite3_threadsafe() != 1) {
+    cerr << "Wrong sqlite3 thread mode\n";
+    sqlite3_config(SQLITE_CONFIG_SERIALIZED);
+  }
+
   sqlite3 *dbTweet, *dbKnow;
-  sqlite3_open(Twitter_database_tweet, &dbTweet);
-  sqlite3_open(Twitter_database_knowledge, &dbKnow);
+  int rc;
+  rc = sqlite3_open(Twitter_database_tweet, &dbTweet);
+  rc += sqlite3_open(Twitter_database_knowledge, &dbKnow);
+  if(rc) {
+    cout << "opening database failed\n";
+    sqlite3_close(dbTweet);
+    sqlite3_close(dbKnow);
+    exit(-1);
+  }
 #ifdef Twitter_login_args
   assert(argc > 1);
   TwitterChatBot twit(argv[1], dbTweet, dbKnow);
@@ -30,9 +42,10 @@ int main (int argc, char *argv[]) {
     }else{
       twit.startFeed();
     }
-    sleep(5);
+    sleep(Twitter_Queue_checkTime);
   }
-  twit.stopFeed();
-  //sleep(10);
+  twit.stop();
+  sqlite3_close(dbTweet);
+  sqlite3_close(dbKnow);
   return 0;
 }
