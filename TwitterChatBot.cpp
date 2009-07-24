@@ -6,7 +6,10 @@
 #include <string>
 #include <stdlib.h>
 #include <iostream>
+#include <sstream>
 using namespace std;
+
+vector<vector<string> > SqlQuery(string, sqlite3*);
 
 void TwitterChatBot::startFeed () {
   /// if feed is running do nothing
@@ -75,13 +78,29 @@ size_t TwitterChatBot::StreamCallBack (char * str, size_t size, size_t nmemb, Tw
 void TwitterChatBot::proccessStream (string & data) {
   //cout << data << endl << endl;
   matthewfl::json j;
+  stringstream message;
   j.prase(data);
   if(!j["delete"].empty()) {
+    matthewfl::json d = j["delete"]["status"];
+    message << "DELETE FROM tweet WHERE byID=" 
+	    << d["user_id"].cast<matthewfl::json::Number>()
+	    << " AND tweetID="
+	    << d["id"].cast<matthewfl::json::Number>();
+    
     // TODO: make a delete spool for deleting tweets out of the data base
+    tweetQueue.push(message.str());
     return;
   }
   if(!j["text"].empty()) {
-     cout << j["text"].cast<matthewfl::json::String>() << endl;
+    cout << j["text"].cast<matthewfl::json::String>() << endl;
+    message << "INSERT INTO tweet (text, byID, byName, tweetID, toID) VALUES (\""
+	    << j["text"].cast<matthewfl::json::String>() // make this safe to insert
+	    << "\", " << j["user_id"].cast<matthewfl::json::Number>() 
+	    << ", \"" << j["user_name"].cast<matthewfl::json::String>()
+	    << "\", " << j["id"].cast<matthewfl::json::Number>()
+	    << ", "   << j["in_reply_to_user_id"].cast<matthewfl::json::Number>()
+	    << ");";
+    tweetQueue.push(message.str());
     if(!j["in_reply_to_user_id"].empty()) {
       cout << "reply to: ";
       cout << j["in_reply_to_user_id"].cast<matthewfl::json::Number>() << endl << endl;
@@ -93,7 +112,8 @@ void * TwitterChatBot::AddTweetData (void * s) {
   TwitterChatBot * self = reinterpret_cast<TwitterChatBot*>(s);
   while(1) {
     while(!self->tweetQueue.empty()) {
-      
+      SqlQuery(self->tweetQueue.front(), self->Tweet);
+      self->tweetQueue.pop();
     }
     sleep(1);
   }
@@ -105,10 +125,39 @@ unsigned int TwitterChatBot::queueSize() {
 }
 
 void TwitterChatBot::start() {
-  pthread_create(&PtweetData, NULL, AddTweetData, (void*)this);
+  if(!SystemRunning) {
+    pthread_create(&PtweetData, NULL, AddTweetData, (void*)this);
+  }
 }
 
 void TwitterChatBot::stop() {
-  pthread_cancel(PtweetData);
-
+  if(SystemRunning) {
+    stopFeed();
+    pthread_cancel(PtweetData);
+  }
 }
+
+
+// database code
+
+
+static int SqlCallBack(void * passed, int argc, char **argv, char **azColName) {
+  vector<vector<string> > * p = reinterpret_cast<vector<vector<string> >* >(passed);
+  vector<string> data;
+  for(int i=0; i<argc;i++) {
+    data.push_back(string(argv[i]));
+  }
+  p->push_back(data);
+  return 0;
+}
+
+vector<vector<string> > SqlQuery (string q, sqlite3 * db) {
+  char *error=0;
+  vector<vector<string> > passed;
+  if(SQLITE_OK != sqlite3_exec(db, q.c_str(), SqlCallBack, (void*)(&passed), &error)) {
+    cerr<<"sql error: "<<error<<endl;
+    sqlite3_free(error);
+  }
+  return passed;
+}
+
