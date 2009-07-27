@@ -17,7 +17,7 @@
 
 // the max size of all the queues
 #define Twitter_Queue_maxsize 500
-#define Twitter_Queue_checkTime 5
+#define Twitter_Queue_checkTime_sec 5
 
 #endif // _tiwtter_config_h
 

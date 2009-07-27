@@ -1,6 +1,8 @@
 #include "TwitterChatBot.h"
 #include <pthread.h>
 #include <curl/curl.h>
+#include <boost/algorithm/string/replace.hpp> // used for minor clean up on tweet when saving
+
 #include <matthewfl/json.hpp>
 
 #include <string>
@@ -20,6 +22,7 @@ void TwitterChatBot::startFeed () {
 }
 
 void TwitterChatBot::stopFeed() {
+  /// if feed not running do nothing
   if(feedRunning) {
     pthread_cancel(Pfeed);
     curl_easy_pause(curl, CURLPAUSE_ALL);
@@ -76,7 +79,7 @@ size_t TwitterChatBot::StreamCallBack (char * str, size_t size, size_t nmemb, Tw
 }
 
 void TwitterChatBot::proccessStream (string & data) {
-  //cout << data << endl << endl;
+  cout << data << endl << endl;
   matthewfl::json j;
   stringstream message;
   j.prase(data);
@@ -88,22 +91,30 @@ void TwitterChatBot::proccessStream (string & data) {
 	    << d["id"].cast<matthewfl::json::Number>();
     
     // TODO: make a delete spool for deleting tweets out of the data base
-    tweetQueue.push(message.str());
+    // TODO: add back in when saving of tweets is working
+    // tweetQueue.push(message.str());
     return;
   }
   if(!j["text"].empty()) {
-    cout << j["text"].cast<matthewfl::json::String>() << endl;
+    
+    matthewfl::json user = j["user"];
     message << "INSERT INTO tweet (text, byID, byName, tweetID, toID) VALUES (\""
-	    << j["text"].cast<matthewfl::json::String>() // make this safe to insert
-	    << "\", " << j["user_id"].cast<matthewfl::json::Number>() 
-	    << ", \"" << j["user_name"].cast<matthewfl::json::String>()
-	    << "\", " << j["id"].cast<matthewfl::json::Number>()
-	    << ", "   << j["in_reply_to_user_id"].cast<matthewfl::json::Number>()
-	    << ");";
+	    << boost::replace_all_copy(j["text"].cast<matthewfl::json::String>(), "\"", "\\\"") // make this safe to insert
+	    << "\", " << user["id"].cast<matthewfl::json::Number>() 
+	    << ", \"" << user["screen_name"].cast<matthewfl::json::String>()
+	    << "\", " << j["id"].cast<matthewfl::json::Number>() << ", ";
+    if(j["in_reply_to_user_id"].empty())
+      message << "NULL";
+    else
+      message << j["in_reply_to_user_id"].cast<matthewfl::json::Number>();
+    message << ");";
     tweetQueue.push(message.str());
+    cout << "@" << user["screen_name"].cast<matthewfl::json::String>() << " :  "
+	 << j["text"].cast<matthewfl::json::String>() <<endl;
     if(!j["in_reply_to_user_id"].empty()) {
-      cout << "reply to: ";
-      cout << j["in_reply_to_user_id"].cast<matthewfl::json::Number>() << endl << endl;
+      cout << "\t\t\treply to: ";
+      cout << j["in_reply_to_user_id"].cast<matthewfl::json::Number>()
+	   << "  " << j["in_reply_to_screen_name"].cast<matthewfl::json::String>() << endl;
     }
   }
 }
@@ -115,12 +126,14 @@ void * TwitterChatBot::AddTweetData (void * s) {
       SqlQuery(self->tweetQueue.front(), self->Tweet);
       self->tweetQueue.pop();
     }
+    cout << "database sleep\n";
     sleep(1);
   }
   return NULL;
 }
 
 unsigned int TwitterChatBot::queueSize() {
+  /// sum all of the queues that are used
   return tweetQueue.size();
 }
 

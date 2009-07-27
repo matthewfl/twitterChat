@@ -1,4 +1,6 @@
 *.o
 *.database
+*.log
+\#*
 # binary
 /twitterChat

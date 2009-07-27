@@ -42,7 +42,7 @@ int main (int argc, char *argv[]) {
     }else{
       twit.startFeed();
     }
-    sleep(Twitter_Queue_checkTime);
+    sleep(Twitter_Queue_checkTime_sec);
   }
   twit.stop();
   sqlite3_close(dbTweet);
